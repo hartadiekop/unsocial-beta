@@ -1,11 +1,26 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+    <div className="min-h-screen p-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold">Unsocial</h1>
+          <Button variant="outline" onClick={handleSignOut}>
+            Keluar
+          </Button>
+        </div>
+        <div className="text-center py-12">
+          <h2 className="text-xl">Selamat datang di Unsocial!</h2>
+          <p className="text-muted-foreground mt-2">
+            Halaman ini akan segera diperbarui dengan fitur-fitur utama.
+          </p>
+        </div>
       </div>
     </div>
   );
