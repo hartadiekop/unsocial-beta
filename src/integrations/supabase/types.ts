@@ -9,7 +9,151 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      constellation_members: {
+        Row: {
+          constellation_id: string | null
+          created_at: string
+          id: string
+          profile_id: string | null
+        }
+        Insert: {
+          constellation_id?: string | null
+          created_at?: string
+          id?: string
+          profile_id?: string | null
+        }
+        Update: {
+          constellation_id?: string | null
+          created_at?: string
+          id?: string
+          profile_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "constellation_members_constellation_id_fkey"
+            columns: ["constellation_id"]
+            isOneToOne: false
+            referencedRelation: "constellations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "constellation_members_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      constellations: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      matches: {
+        Row: {
+          constellation_id: string | null
+          created_at: string
+          id: string
+          profile1_id: string | null
+          profile2_id: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          constellation_id?: string | null
+          created_at?: string
+          id?: string
+          profile1_id?: string | null
+          profile2_id?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          constellation_id?: string | null
+          created_at?: string
+          id?: string
+          profile1_id?: string | null
+          profile2_id?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matches_constellation_id_fkey"
+            columns: ["constellation_id"]
+            isOneToOne: false
+            referencedRelation: "constellations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_profile1_id_fkey"
+            columns: ["profile1_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_profile2_id_fkey"
+            columns: ["profile2_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          bio: string | null
+          created_at: string
+          dating_preferences: Json | null
+          full_name: string
+          id: string
+          is_approved: boolean | null
+          updated_at: string
+          whatsapp: string
+        }
+        Insert: {
+          bio?: string | null
+          created_at?: string
+          dating_preferences?: Json | null
+          full_name: string
+          id: string
+          is_approved?: boolean | null
+          updated_at?: string
+          whatsapp: string
+        }
+        Update: {
+          bio?: string | null
+          created_at?: string
+          dating_preferences?: Json | null
+          full_name?: string
+          id?: string
+          is_approved?: boolean | null
+          updated_at?: string
+          whatsapp?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
