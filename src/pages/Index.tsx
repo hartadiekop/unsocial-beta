@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import {
   Card,
   CardContent,
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Loader2, LogOut, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import ProfileForm from "@/components/ProfileForm";
 
 interface Profile {
   id: string;
@@ -45,7 +46,7 @@ const Index = () => {
     getUser();
   }, []);
 
-  const { data: profile, isLoading: profileLoading, error: profileError } = useQuery({
+  const { data: profile, isLoading: profileLoading, error: profileError, refetch: refetchProfile } = useQuery({
     queryKey: ["profile", userId],
     queryFn: async () => {
       if (!userId) return null;
@@ -60,16 +61,6 @@ const Index = () => {
         console.error("Error fetching profile:", error);
         throw error;
       }
-      
-      if (!data) {
-        toast({
-          variant: "destructive",
-          title: "Profile not found",
-          description: "Please complete your profile registration.",
-        });
-        return null;
-      }
-      
       return data as Profile;
     },
     enabled: !!userId,
@@ -109,7 +100,7 @@ const Index = () => {
     }
   };
 
-  if (profileLoading || constellationsLoading) {
+  if (profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -130,7 +121,13 @@ const Index = () => {
           </Button>
         </div>
 
-        {profile ? (
+        {!userId ? (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Loading...</CardTitle>
+            </CardHeader>
+          </Card>
+        ) : profile ? (
           <Card className="mb-8">
             <CardHeader>
               <CardTitle>Welcome, {profile.full_name}!</CardTitle>
@@ -145,14 +142,7 @@ const Index = () => {
             </CardContent>
           </Card>
         ) : (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>Welcome!</CardTitle>
-              <CardDescription>
-                Please complete your profile registration to continue.
-              </CardDescription>
-            </CardHeader>
-          </Card>
+          <ProfileForm userId={userId} onSuccess={refetchProfile} />
         )}
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
