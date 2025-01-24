@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,8 +15,43 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [pendingProfile, setPendingProfile] = useState<{id: string, full_name: string, whatsapp: string} | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Listen for auth changes to create profile after successful signup
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session);
+      if (event === 'SIGNED_IN' && pendingProfile && session) {
+        try {
+          console.log("Creating profile for authenticated user...");
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .insert([pendingProfile]);
+
+          if (profileError) {
+            console.error("Profile creation error:", profileError);
+            throw profileError;
+          }
+          console.log("Profile created successfully");
+          setPendingProfile(null);
+          navigate("/");
+        } catch (error: any) {
+          console.error("Profile creation error:", error);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: error.message,
+          });
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [pendingProfile, navigate, toast]);
 
   const validateForm = () => {
     if (!email || !password) {
@@ -72,31 +107,22 @@ const Auth = () => {
 
         if (signUpError) throw signUpError;
         
-        console.log("Signup successful, creating profile...");
+        console.log("Signup successful, queueing profile creation...");
         console.log("User data:", signUpData);
         
         if (signUpData.user) {
-          const { error: profileError } = await supabase
-            .from("profiles")
-            .insert([
-              {
-                id: signUpData.user.id,
-                full_name: fullName,
-                whatsapp: whatsapp,
-              },
-            ]);
-
-          if (profileError) {
-            console.error("Profile creation error:", profileError);
-            throw profileError;
-          }
-          console.log("Profile created successfully");
+          // Queue the profile for creation after auth state change
+          setPendingProfile({
+            id: signUpData.user.id,
+            full_name: fullName,
+            whatsapp: whatsapp,
+          });
+          
+          toast({
+            title: "Berhasil mendaftar!",
+            description: "Silakan cek email Anda untuk verifikasi.",
+          });
         }
-
-        toast({
-          title: "Berhasil mendaftar!",
-          description: "Silakan cek email Anda untuk verifikasi.",
-        });
       } else {
         console.log("Attempting login...");
         const { error } = await supabase.auth.signInWithPassword({
