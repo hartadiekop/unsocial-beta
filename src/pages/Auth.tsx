@@ -60,7 +60,7 @@ const Auth = () => {
     try {
       if (isSignUp) {
         console.log("Attempting signup...");
-        const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -71,20 +71,25 @@ const Auth = () => {
         });
 
         if (signUpError) throw signUpError;
-
+        
         console.log("Signup successful, creating profile...");
-        if (authData.user) {
+        console.log("User data:", signUpData);
+        
+        if (signUpData.user) {
           const { error: profileError } = await supabase
             .from("profiles")
             .insert([
               {
-                id: authData.user.id,
+                id: signUpData.user.id,
                 full_name: fullName,
                 whatsapp: whatsapp,
               },
             ]);
 
-          if (profileError) throw profileError;
+          if (profileError) {
+            console.error("Profile creation error:", profileError);
+            throw profileError;
+          }
           console.log("Profile created successfully");
         }
 
