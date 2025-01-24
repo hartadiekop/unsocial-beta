@@ -45,20 +45,31 @@ const Index = () => {
     getUser();
   }, []);
 
-  const { data: profile, isLoading: profileLoading } = useQuery({
+  const { data: profile, isLoading: profileLoading, error: profileError } = useQuery({
     queryKey: ["profile", userId],
     queryFn: async () => {
       if (!userId) return null;
+      console.log("Fetching profile for user:", userId);
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error("Error fetching profile:", error);
         throw error;
       }
+      
+      if (!data) {
+        toast({
+          variant: "destructive",
+          title: "Profile not found",
+          description: "Please complete your profile registration.",
+        });
+        return null;
+      }
+      
       return data as Profile;
     },
     enabled: !!userId,
@@ -119,7 +130,7 @@ const Index = () => {
           </Button>
         </div>
 
-        {profile && (
+        {profile ? (
           <Card className="mb-8">
             <CardHeader>
               <CardTitle>Welcome, {profile.full_name}!</CardTitle>
@@ -132,6 +143,15 @@ const Index = () => {
             <CardContent>
               <p className="text-muted-foreground">{profile.bio || "No bio yet"}</p>
             </CardContent>
+          </Card>
+        ) : (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Welcome!</CardTitle>
+              <CardDescription>
+                Please complete your profile registration to continue.
+              </CardDescription>
+            </CardHeader>
           </Card>
         )}
 
