@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, LogOut, Users } from "lucide-react";
+import { Loader2, LogOut, Users, UserCheck, UserPlus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import ProfileForm from "@/components/ProfileForm";
 
@@ -82,6 +82,35 @@ const Index = () => {
     },
   });
 
+  const handleJoinConstellation = async (constellationId: string) => {
+    if (!userId || !profile) return;
+
+    try {
+      const { error } = await supabase
+        .from("constellation_members")
+        .insert([
+          {
+            profile_id: userId,
+            constellation_id: constellationId,
+          },
+        ]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success!",
+        description: "You've joined the constellation.",
+      });
+    } catch (error: any) {
+      console.error("Error joining constellation:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    }
+  };
+
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut();
@@ -130,42 +159,62 @@ const Index = () => {
         ) : profile ? (
           <Card className="mb-8">
             <CardHeader>
-              <CardTitle>Welcome, {profile.full_name}!</CardTitle>
-              <CardDescription>
-                {profile.is_approved
-                  ? "Your profile is approved and visible to others"
-                  : "Your profile is pending approval"}
-              </CardDescription>
+              <div className="flex items-center gap-2">
+                {profile.is_approved ? (
+                  <UserCheck className="h-6 w-6 text-green-500" />
+                ) : (
+                  <UserPlus className="h-6 w-6 text-yellow-500" />
+                )}
+                <div>
+                  <CardTitle>Welcome, {profile.full_name}!</CardTitle>
+                  <CardDescription>
+                    {profile.is_approved
+                      ? "Your profile is approved and visible to others"
+                      : "Your profile is pending approval"}
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">{profile.bio || "No bio yet"}</p>
+              <div className="space-y-4">
+                <p className="text-muted-foreground">{profile.bio || "No bio yet"}</p>
+                <p className="text-sm">WhatsApp: {profile.whatsapp}</p>
+              </div>
             </CardContent>
           </Card>
         ) : (
           <ProfileForm userId={userId} onSuccess={refetchProfile} />
         )}
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {constellations?.map((constellation) => (
-            <Card key={constellation.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  {constellation.name}
-                </CardTitle>
-                <CardDescription>
-                  Created on{" "}
-                  {new Date(constellation.created_at).toLocaleDateString()}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {constellation.description || "No description available"}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {profile && (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {constellations?.map((constellation) => (
+              <Card key={constellation.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    {constellation.name}
+                  </CardTitle>
+                  <CardDescription>
+                    Created on{" "}
+                    {new Date(constellation.created_at).toLocaleDateString()}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                    {constellation.description || "No description available"}
+                  </p>
+                  <Button 
+                    onClick={() => handleJoinConstellation(constellation.id)}
+                    className="w-full"
+                  >
+                    Join Constellation
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {constellations?.length === 0 && (
           <Card className="mt-8">
