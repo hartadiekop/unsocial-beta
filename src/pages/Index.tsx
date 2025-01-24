@@ -13,6 +13,7 @@ import {
 import { Loader2, LogOut, Users, UserCheck, UserPlus, Shield } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import ProfileForm from "@/components/ProfileForm";
+import ConstellationList from "@/components/admin/ConstellationList";
 
 interface Profile {
   id: string;
@@ -35,71 +36,26 @@ const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [userId, setUserId] = useState<string | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [pendingProfiles, setPendingProfiles] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
-        console.log("Current user:", user);
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+        setProfile(profileData);
       }
+      setLoading(false);
     };
     getUser();
   }, []);
-
-  const { data: profile, isLoading: profileLoading, error: profileError, refetch: refetchProfile } = useQuery({
-    queryKey: ["profile", userId],
-    queryFn: async () => {
-      if (!userId) return null;
-      console.log("Fetching profile for user:", userId);
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Error fetching profile:", error);
-        throw error;
-      }
-      return data as Profile;
-    },
-    enabled: !!userId,
-  });
-
-  const { data: pendingProfiles, isLoading: pendingProfilesLoading } = useQuery({
-    queryKey: ["pendingProfiles"],
-    queryFn: async () => {
-      if (!profile?.role || profile.role !== 'admin') return [];
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("is_approved", false);
-
-      if (error) {
-        console.error("Error fetching pending profiles:", error);
-        throw error;
-      }
-      return data as Profile[];
-    },
-    enabled: !!profile?.role && profile.role === 'admin',
-  });
-
-  const { data: constellations, isLoading: constellationsLoading } = useQuery({
-    queryKey: ["constellations"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("constellations")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching constellations:", error);
-        throw error;
-      }
-      return data as Constellation[];
-    },
-  });
 
   const handleApproveProfile = async (profileId: string) => {
     try {
@@ -114,41 +70,14 @@ const Index = () => {
         title: "Success",
         description: "Profile approved successfully",
       });
-      
-      // Refetch pending profiles
-      const { refetch } = useQuery({ queryKey: ["pendingProfiles"] });
-      refetch();
+
+      const { data: pendingProfilesData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("is_approved", false);
+      setPendingProfiles(pendingProfilesData);
     } catch (error: any) {
       console.error("Error approving profile:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message,
-      });
-    }
-  };
-
-  const handleJoinConstellation = async (constellationId: string) => {
-    if (!userId || !profile) return;
-
-    try {
-      const { error } = await supabase
-        .from("constellation_members")
-        .insert([
-          {
-            profile_id: userId,
-            constellation_id: constellationId,
-          },
-        ]);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success!",
-        description: "You've joined the constellation.",
-      });
-    } catch (error: any) {
-      console.error("Error joining constellation:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -175,7 +104,7 @@ const Index = () => {
     }
   };
 
-  if (profileLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -231,86 +160,45 @@ const Index = () => {
             </Card>
 
             {profile.role === 'admin' && (
-              <Card className="mb-8">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5" />
-                    Admin Dashboard
-                  </CardTitle>
-                  <CardDescription>
-                    Manage pending profile approvals
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {pendingProfilesLoading ? (
-                    <div className="flex justify-center py-4">
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                    </div>
-                  ) : pendingProfiles && pendingProfiles.length > 0 ? (
-                    <div className="space-y-4">
-                      {pendingProfiles.map((pendingProfile) => (
-                        <div key={pendingProfile.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div>
-                            <p className="font-medium">{pendingProfile.full_name}</p>
-                            <p className="text-sm text-muted-foreground">{pendingProfile.whatsapp}</p>
+              <>
+                <Card className="mb-8">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Shield className="h-5 w-5" />
+                      Admin Dashboard
+                    </CardTitle>
+                    <CardDescription>
+                      Manage pending profile approvals
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {pendingProfiles.length > 0 ? (
+                      <div className="space-y-4">
+                        {pendingProfiles.map((pendingProfile) => (
+                          <div key={pendingProfile.id} className="flex items-center justify-between p-4 border rounded-lg">
+                            <div>
+                              <p className="font-medium">{pendingProfile.full_name}</p>
+                              <p className="text-sm text-muted-foreground">{pendingProfile.whatsapp}</p>
+                            </div>
+                            <Button onClick={() => handleApproveProfile(pendingProfile.id)}>
+                              <UserCheck className="h-4 w-4 mr-2" />
+                              Approve
+                            </Button>
                           </div>
-                          <Button onClick={() => handleApproveProfile(pendingProfile.id)}>
-                            <UserCheck className="h-4 w-4 mr-2" />
-                            Approve
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground">No pending profiles to approve</p>
-                  )}
-                </CardContent>
-              </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">No pending profiles to approve</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <ConstellationList />
+              </>
             )}
           </>
         ) : (
-          <ProfileForm userId={userId} onSuccess={refetchProfile} />
-        )}
-
-        {profile && (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {constellations?.map((constellation) => (
-              <Card key={constellation.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    {constellation.name}
-                  </CardTitle>
-                  <CardDescription>
-                    Created on{" "}
-                    {new Date(constellation.created_at).toLocaleDateString()}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground mb-4">
-                    {constellation.description || "No description available"}
-                  </p>
-                  <Button 
-                    onClick={() => handleJoinConstellation(constellation.id)}
-                    className="w-full"
-                  >
-                    Join Constellation
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {constellations?.length === 0 && (
-          <Card className="mt-8">
-            <CardHeader>
-              <CardTitle>No Constellations Yet</CardTitle>
-              <CardDescription>
-                Join or create a constellation to start connecting with others
-              </CardDescription>
-            </CardHeader>
-          </Card>
+          <ProfileForm userId={userId} onSuccess={() => {}} />
         )}
       </div>
     </div>
