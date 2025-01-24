@@ -129,6 +129,7 @@ export type Database = {
           full_name: string
           id: string
           is_approved: boolean | null
+          role: Database["public"]["Enums"]["user_role"]
           updated_at: string
           whatsapp: string
         }
@@ -139,6 +140,7 @@ export type Database = {
           full_name: string
           id: string
           is_approved?: boolean | null
+          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           whatsapp: string
         }
@@ -149,6 +151,7 @@ export type Database = {
           full_name?: string
           id?: string
           is_approved?: boolean | null
+          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           whatsapp?: string
         }
@@ -162,7 +165,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      user_role: "user" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
