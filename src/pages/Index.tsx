@@ -10,8 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, LogOut, UserCheck, UserPlus, Shield } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Loader2, LogOut, UserCheck, UserPlus, Shield, UserX } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ProfileForm from "@/components/ProfileForm";
 import ConstellationList from "@/components/admin/ConstellationList";
 import UserConstellations from "@/components/user/UserConstellations";
@@ -31,6 +31,7 @@ const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [userId, setUserId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // Use React Query to fetch and cache the profile data
   const { data: profile, isLoading: profileLoading, error: profileError } = useQuery({
@@ -62,8 +63,78 @@ const Index = () => {
       }
     },
     enabled: !!userId,
-    retry: 1, // Only retry once to avoid too many retries on actual errors
+    retry: 1,
   });
+
+  // Fetch pending users for admin
+  const { data: pendingUsers, isLoading: pendingUsersLoading } = useQuery({
+    queryKey: ['pending-users'],
+    queryFn: async () => {
+      if (profile?.role !== 'admin') return null;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('is_approved', false)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profile && profile.role === 'admin',
+  });
+
+  const handleApproveUser = async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_approved: true })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "User has been approved",
+      });
+
+      // Invalidate queries to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['pending-users'] });
+    } catch (error: any) {
+      console.error('Error approving user:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    }
+  };
+
+  const handleRejectUser = async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_approved: false })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "User has been rejected",
+      });
+
+      // Invalidate queries to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['pending-users'] });
+    } catch (error: any) {
+      console.error('Error rejecting user:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    }
+  };
 
   useEffect(() => {
     const getUser = async () => {
@@ -109,7 +180,6 @@ const Index = () => {
     );
   }
 
-  // Handle the case where we have no userId yet
   if (!userId) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -118,12 +188,10 @@ const Index = () => {
     );
   }
 
-  // Special handling for the case where profile doesn't exist
   if (profileError) {
     console.error("Profile error details:", profileError);
     const pgError = profileError as PostgrestError;
     
-    // PGRST116 is the error code when no rows are returned
     if (pgError.code === 'PGRST116') {
       console.log("No profile found, showing profile form");
       return <ProfileForm userId={userId} onSuccess={() => window.location.reload()} />;
@@ -196,6 +264,60 @@ const Index = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {profile.role === 'admin' && (
+              <Card className="mb-8">
+                <CardHeader>
+                  <CardTitle>Pending Approvals</CardTitle>
+                  <CardDescription>
+                    Manage user approval requests
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {pendingUsersLoading ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                  ) : pendingUsers && pendingUsers.length > 0 ? (
+                    <div className="space-y-4">
+                      {pendingUsers.map((user: Profile) => (
+                        <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div>
+                            <p className="font-medium">{user.full_name}</p>
+                            <p className="text-sm text-muted-foreground">{user.whatsapp}</p>
+                            {user.bio && (
+                              <p className="text-sm mt-1">{user.bio}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleApproveUser(user.id)}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <UserCheck className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRejectUser(user.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <UserX className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-4">
+                      No pending approval requests
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {profile.role === 'admin' ? (
               <ConstellationList />
