@@ -30,22 +30,36 @@ const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [userId, setUserId] = useState<string | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  // Use React Query to fetch and cache the profile data
+  const { data: profile, isLoading: profileLoading, error: profileError } = useQuery({
+    queryKey: ['profile', userId],
+    queryFn: async () => {
+      if (!userId) return null;
+      console.log("Fetching profile for user:", userId);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching profile:", error);
+        throw error;
+      }
+      console.log("Profile data:", data);
+      return data as Profile;
+    },
+    enabled: !!userId, // Only run query when userId is available
+  });
 
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        console.log("Current user:", user.id);
         setUserId(user.id);
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-        setProfile(profileData);
       }
-      setLoading(false);
     };
     getUser();
   }, []);
@@ -68,10 +82,31 @@ const Index = () => {
     }
   };
 
-  if (loading) {
+  if (profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (profileError) {
+    console.error("Profile error:", profileError);
+    // Only show ProfileForm if the error is that the profile doesn't exist
+    if (profileError.code === 'PGRST116') {
+      return userId ? <ProfileForm userId={userId} onSuccess={() => window.location.reload()} /> : null;
+    }
+    
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card>
+          <CardHeader>
+            <CardTitle>Error</CardTitle>
+            <CardDescription>
+              There was an error loading your profile. Please try again later.
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     );
   }
@@ -95,7 +130,9 @@ const Index = () => {
               <CardTitle>Loading...</CardTitle>
             </CardHeader>
           </Card>
-        ) : profile ? (
+        ) : !profile ? (
+          <ProfileForm userId={userId} onSuccess={() => window.location.reload()} />
+        ) : (
           <>
             <Card className="mb-8">
               <CardHeader>
@@ -129,8 +166,6 @@ const Index = () => {
               profile.is_approved && <UserConstellations />
             )}
           </>
-        ) : (
-          <ProfileForm userId={userId} onSuccess={() => {}} />
         )}
       </div>
     </div>
