@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import ProfileForm from "@/components/ProfileForm";
 import ConstellationList from "@/components/admin/ConstellationList";
 import UserConstellations from "@/components/user/UserConstellations";
+import { PostgrestError } from "@supabase/supabase-js";
 
 interface Profile {
   id: string;
@@ -92,8 +93,10 @@ const Index = () => {
 
   if (profileError) {
     console.error("Profile error:", profileError);
+    // Cast the error to PostgrestError to access the code property
+    const pgError = profileError as PostgrestError;
     // Only show ProfileForm if the error is that the profile doesn't exist
-    if (profileError.code === 'PGRST116') {
+    if (pgError.code === 'PGRST116') {
       return userId ? <ProfileForm userId={userId} onSuccess={() => window.location.reload()} /> : null;
     }
     
