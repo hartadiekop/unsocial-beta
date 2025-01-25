@@ -10,10 +10,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, LogOut, Users, UserCheck, UserPlus, Shield } from "lucide-react";
+import { Loader2, LogOut, UserCheck, UserPlus, Shield } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import ProfileForm from "@/components/ProfileForm";
 import ConstellationList from "@/components/admin/ConstellationList";
+import UserConstellations from "@/components/user/UserConstellations";
 
 interface Profile {
   id: string;
@@ -25,19 +26,11 @@ interface Profile {
   role: 'user' | 'admin';
 }
 
-interface Constellation {
-  id: string;
-  name: string;
-  description: string | null;
-  created_at: string;
-}
-
 const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [pendingProfiles, setPendingProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -56,35 +49,6 @@ const Index = () => {
     };
     getUser();
   }, []);
-
-  const handleApproveProfile = async (profileId: string) => {
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ is_approved: true })
-        .eq("id", profileId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Profile approved successfully",
-      });
-
-      const { data: pendingProfilesData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("is_approved", false);
-      setPendingProfiles(pendingProfilesData);
-    } catch (error: any) {
-      console.error("Error approving profile:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message,
-      });
-    }
-  };
 
   const handleSignOut = async () => {
     try {
@@ -159,42 +123,10 @@ const Index = () => {
               </CardContent>
             </Card>
 
-            {profile.role === 'admin' && (
-              <>
-                <Card className="mb-8">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Shield className="h-5 w-5" />
-                      Admin Dashboard
-                    </CardTitle>
-                    <CardDescription>
-                      Manage pending profile approvals
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {pendingProfiles.length > 0 ? (
-                      <div className="space-y-4">
-                        {pendingProfiles.map((pendingProfile) => (
-                          <div key={pendingProfile.id} className="flex items-center justify-between p-4 border rounded-lg">
-                            <div>
-                              <p className="font-medium">{pendingProfile.full_name}</p>
-                              <p className="text-sm text-muted-foreground">{pendingProfile.whatsapp}</p>
-                            </div>
-                            <Button onClick={() => handleApproveProfile(pendingProfile.id)}>
-                              <UserCheck className="h-4 w-4 mr-2" />
-                              Approve
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-muted-foreground">No pending profiles to approve</p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <ConstellationList />
-              </>
+            {profile.role === 'admin' ? (
+              <ConstellationList />
+            ) : (
+              profile.is_approved && <UserConstellations />
             )}
           </>
         ) : (
