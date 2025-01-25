@@ -36,34 +36,52 @@ const Index = () => {
   const { data: profile, isLoading: profileLoading, error: profileError } = useQuery({
     queryKey: ['profile', userId],
     queryFn: async () => {
-      if (!userId) return null;
-      console.log("Fetching profile for user:", userId);
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
+      if (!userId) {
+        console.log("No userId available yet");
+        return null;
+      }
+      
+      console.log("Attempting to fetch profile for user:", userId);
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", userId)
+          .single();
 
-      if (error) {
-        console.error("Error fetching profile:", error);
+        if (error) {
+          console.error("Supabase error fetching profile:", error);
+          throw error;
+        }
+
+        console.log("Successfully fetched profile:", data);
+        return data as Profile;
+      } catch (error) {
+        console.error("Error in profile fetch:", error);
         throw error;
       }
-      console.log("Profile data:", data);
-      return data as Profile;
     },
-    enabled: !!userId, // Only run query when userId is available
+    enabled: !!userId,
+    retry: 1, // Only retry once to avoid too many retries on actual errors
   });
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error("Error getting user:", error);
+        return;
+      }
       if (user) {
-        console.log("Current user:", user.id);
+        console.log("Current user found:", user.id);
         setUserId(user.id);
+      } else {
+        console.log("No user found, redirecting to auth");
+        navigate("/auth");
       }
     };
     getUser();
-  }, []);
+  }, [navigate]);
 
   const handleSignOut = async () => {
     try {
@@ -91,24 +109,46 @@ const Index = () => {
     );
   }
 
+  // Handle the case where we have no userId yet
+  if (!userId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  // Special handling for the case where profile doesn't exist
   if (profileError) {
-    console.error("Profile error:", profileError);
-    // Cast the error to PostgrestError to access the code property
+    console.error("Profile error details:", profileError);
     const pgError = profileError as PostgrestError;
-    // Only show ProfileForm if the error is that the profile doesn't exist
+    
+    // PGRST116 is the error code when no rows are returned
     if (pgError.code === 'PGRST116') {
-      return userId ? <ProfileForm userId={userId} onSuccess={() => window.location.reload()} /> : null;
+      console.log("No profile found, showing profile form");
+      return <ProfileForm userId={userId} onSuccess={() => window.location.reload()} />;
     }
     
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Error</CardTitle>
+            <CardTitle className="text-destructive">Error Loading Profile</CardTitle>
             <CardDescription>
-              There was an error loading your profile. Please try again later.
+              There was an error loading your profile. Error code: {pgError.code}
+              <br />
+              Message: {pgError.message}
             </CardDescription>
           </CardHeader>
+          <CardContent>
+            <Button 
+              variant="outline" 
+              onClick={() => window.location.reload()}
+              className="w-full"
+            >
+              Try Again
+            </Button>
+          </CardContent>
         </Card>
       </div>
     );
@@ -127,13 +167,7 @@ const Index = () => {
           </Button>
         </div>
 
-        {!userId ? (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>Loading...</CardTitle>
-            </CardHeader>
-          </Card>
-        ) : !profile ? (
+        {!profile ? (
           <ProfileForm userId={userId} onSuccess={() => window.location.reload()} />
         ) : (
           <>
