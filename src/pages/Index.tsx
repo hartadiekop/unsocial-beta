@@ -15,7 +15,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ProfileForm from "@/components/ProfileForm";
 import ConstellationList from "@/components/admin/ConstellationList";
 import UserConstellations from "@/components/user/UserConstellations";
-import { PostgrestError } from "@supabase/supabase-js";
 
 interface Profile {
   id: string;
@@ -33,46 +32,33 @@ const Index = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  // Use React Query to fetch and cache the profile data with simplified query
+  // Simplified profile query with better error handling
   const { data: profile, isLoading: profileLoading, error: profileError } = useQuery({
     queryKey: ['profile', userId],
     queryFn: async () => {
-      if (!userId) {
-        console.log("No userId available yet");
-        return null;
-      }
+      if (!userId) return null;
       
-      console.log("Attempting to fetch profile for user:", userId);
-      try {
-        // Simplified query to just fetch the profile by ID
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("id, full_name, whatsapp, bio, dating_preferences, is_approved, role")
-          .eq("id", userId)
-          .maybeSingle();
+      console.log("Fetching profile for:", userId);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, whatsapp, bio, dating_preferences, is_approved, role")
+        .eq("id", userId)
+        .limit(1)
+        .single();
 
-        if (error) {
-          console.error("Supabase error fetching profile:", error);
-          throw error;
-        }
-
-        if (!data) {
-          console.log("No profile found for user:", userId);
-          return null;
-        }
-
-        console.log("Successfully fetched profile:", data);
-        return data as Profile;
-      } catch (error) {
-        console.error("Error in profile fetch:", error);
+      if (error) {
+        console.error("Profile fetch error:", error);
         throw error;
       }
+
+      return data as Profile;
     },
     enabled: !!userId,
-    retry: false, // Don't retry on failure to avoid infinite loops
+    retry: false,
+    staleTime: 30000, // Cache for 30 seconds
   });
 
-  // Fetch pending users for admin with simplified query
+  // Simplified pending users query
   const { data: pendingUsers, isLoading: pendingUsersLoading } = useQuery({
     queryKey: ['pending-users'],
     queryFn: async () => {
@@ -145,18 +131,12 @@ const Index = () => {
   useEffect(() => {
     const getUser = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
-      if (error) {
-        console.error("Error getting user:", error);
+      if (error || !user) {
+        console.error("Auth error:", error);
         navigate("/auth");
         return;
       }
-      if (user) {
-        console.log("Current user found:", user.id);
-        setUserId(user.id);
-      } else {
-        console.log("No user found, redirecting to auth");
-        navigate("/auth");
-      }
+      setUserId(user.id);
     };
     getUser();
   }, [navigate]);
@@ -170,11 +150,11 @@ const Index = () => {
       });
       navigate("/auth");
     } catch (error) {
-      console.error("Error signing out:", error);
+      console.error("Sign out error:", error);
       toast({
         variant: "destructive",
         title: "Error signing out",
-        description: "There was a problem signing out. Please try again.",
+        description: "Please try again.",
       });
     }
   };
@@ -187,23 +167,14 @@ const Index = () => {
     );
   }
 
-  if (!userId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
   if (profileError) {
-    console.error("Profile error details:", profileError);
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-destructive">Error Loading Profile</CardTitle>
+            <CardTitle className="text-destructive">Error</CardTitle>
             <CardDescription>
-              There was an error loading your profile. Please try refreshing the page.
+              Unable to load profile. Please try again.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -212,12 +183,16 @@ const Index = () => {
               onClick={() => window.location.reload()}
               className="w-full"
             >
-              Try Again
+              Retry
             </Button>
           </CardContent>
         </Card>
       </div>
     );
+  }
+
+  if (!profile) {
+    return <ProfileForm userId={userId} onSuccess={() => window.location.reload()} />;
   }
 
   return (
