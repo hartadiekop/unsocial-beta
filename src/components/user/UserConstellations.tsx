@@ -37,7 +37,7 @@ const UserConstellations = () => {
     },
   });
 
-  // Fetch constellation members when a constellation is selected
+  // Fetch ALL constellation members when a constellation is selected
   const { data: members, isLoading: membersLoading } = useQuery({
     queryKey: ["constellation-members", selectedConstellation],
     queryFn: async () => {
@@ -54,9 +54,11 @@ const UserConstellations = () => {
             bio
           )
         `)
-        .eq("constellation_id", selectedConstellation);
+        .eq("constellation_id", selectedConstellation)
+        .order("created_at", { ascending: true });
 
       if (error) throw error;
+      console.log("Fetched members:", data);
       return data;
     },
     enabled: !!selectedConstellation,
