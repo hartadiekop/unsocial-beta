@@ -32,37 +32,33 @@ const Index = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  // Simplified profile query with better error handling
-  const { data: profile, isLoading: profileLoading, error: profileError } = useQuery({
+  // Basic profile query with minimal complexity
+  const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile', userId],
     queryFn: async () => {
       if (!userId) return null;
       
-      console.log("Fetching profile for:", userId);
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, whatsapp, bio, dating_preferences, is_approved, role")
+        .select("*")
         .eq("id", userId)
-        .limit(1)
         .single();
 
       if (error) {
         console.error("Profile fetch error:", error);
-        throw error;
+        return null;
       }
 
       return data as Profile;
     },
     enabled: !!userId,
-    retry: false,
-    staleTime: 30000, // Cache for 30 seconds
   });
 
   // Simplified pending users query
   const { data: pendingUsers, isLoading: pendingUsersLoading } = useQuery({
     queryKey: ['pending-users'],
     queryFn: async () => {
-      if (profile?.role !== 'admin') return null;
+      if (!profile?.role || profile.role !== 'admin') return null;
       
       const { data, error } = await supabase
         .from('profiles')
@@ -70,7 +66,7 @@ const Index = () => {
         .eq('is_approved', false)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) return null;
       return data;
     },
     enabled: !!profile && profile.role === 'admin',
@@ -130,9 +126,8 @@ const Index = () => {
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error || !user) {
-        console.error("Auth error:", error);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         navigate("/auth");
         return;
       }
@@ -144,17 +139,13 @@ const Index = () => {
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut();
-      toast({
-        title: "Signed out successfully",
-        description: "You have been signed out of your account.",
-      });
       navigate("/auth");
     } catch (error) {
       console.error("Sign out error:", error);
       toast({
         variant: "destructive",
-        title: "Error signing out",
-        description: "Please try again.",
+        title: "Error",
+        description: "Failed to sign out. Please try again.",
       });
     }
   };
@@ -167,7 +158,11 @@ const Index = () => {
     );
   }
 
-  if (profileError) {
+  if (!profile && userId) {
+    return <ProfileForm userId={userId} onSuccess={() => window.location.reload()} />;
+  }
+
+  if (!profile) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -189,10 +184,6 @@ const Index = () => {
         </Card>
       </div>
     );
-  }
-
-  if (!profile) {
-    return <ProfileForm userId={userId} onSuccess={() => window.location.reload()} />;
   }
 
   return (
