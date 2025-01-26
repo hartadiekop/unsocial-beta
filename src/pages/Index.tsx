@@ -33,7 +33,7 @@ const Index = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  // Use React Query to fetch and cache the profile data
+  // Use React Query to fetch and cache the profile data with simplified query
   const { data: profile, isLoading: profileLoading, error: profileError } = useQuery({
     queryKey: ['profile', userId],
     queryFn: async () => {
@@ -44,15 +44,21 @@ const Index = () => {
       
       console.log("Attempting to fetch profile for user:", userId);
       try {
+        // Simplified query to just fetch the profile by ID
         const { data, error } = await supabase
           .from("profiles")
-          .select("*")
+          .select("id, full_name, whatsapp, bio, dating_preferences, is_approved, role")
           .eq("id", userId)
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error("Supabase error fetching profile:", error);
           throw error;
+        }
+
+        if (!data) {
+          console.log("No profile found for user:", userId);
+          return null;
         }
 
         console.log("Successfully fetched profile:", data);
@@ -63,10 +69,10 @@ const Index = () => {
       }
     },
     enabled: !!userId,
-    retry: 1,
+    retry: false, // Don't retry on failure to avoid infinite loops
   });
 
-  // Fetch pending users for admin
+  // Fetch pending users for admin with simplified query
   const { data: pendingUsers, isLoading: pendingUsersLoading } = useQuery({
     queryKey: ['pending-users'],
     queryFn: async () => {
@@ -74,7 +80,7 @@ const Index = () => {
       
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, full_name, whatsapp, bio')
         .eq('is_approved', false)
         .order('created_at', { ascending: false });
 
@@ -141,6 +147,7 @@ const Index = () => {
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error) {
         console.error("Error getting user:", error);
+        navigate("/auth");
         return;
       }
       if (user) {
@@ -190,22 +197,13 @@ const Index = () => {
 
   if (profileError) {
     console.error("Profile error details:", profileError);
-    const pgError = profileError as PostgrestError;
-    
-    if (pgError.code === 'PGRST116') {
-      console.log("No profile found, showing profile form");
-      return <ProfileForm userId={userId} onSuccess={() => window.location.reload()} />;
-    }
-    
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-destructive">Error Loading Profile</CardTitle>
             <CardDescription>
-              There was an error loading your profile. Error code: {pgError.code}
-              <br />
-              Message: {pgError.message}
+              There was an error loading your profile. Please try refreshing the page.
             </CardDescription>
           </CardHeader>
           <CardContent>
